@@ -1,5 +1,5 @@
-# gridmap_cgr_localization
+# Lidar CGR SLAM
 - - -
-**A ROS package for Occupancy Grid Map based Corrective Gradient Refinement Localization**
+**A ROS package for Occupancy Grid Map based SLAM using Corrective Gradient Refinement**
 
 Author:  kandithws
