@@ -230,9 +230,9 @@ void SlamRosWrapper::mapRendererThread() {
     }
 
     if (wait_status || force_render_){
-      ROS_DEBUG("Rendering Map....., in THREAD");
+      ROS_INFO("Rendering Map....., in THREAD");
       updateMap();
-
+      ROS_INFO("Rendering DONE!!, in THREAD");
     }
     else{
       // Waiting longer than map_render_interval_, should never happened ...
@@ -500,6 +500,7 @@ void SlamRosWrapper::initProcessorInstance() {
   slam_nh.param("map_resol", map_resol_, 0.05);
   slam_nh.param("resample_threshold", resample_th_, 0.5);
   slam_nh.param("occ_threshold", occ_thresh_, 0.25);
+  slam_nh.param("use_gmapping", use_gmapping_, true);
 
 
   // TODO -- Make Motion model setup More Dynamic
@@ -533,6 +534,7 @@ bool SlamRosWrapper::initProcessorParams() {
   slam_proc_->setTemporalUpdatePeriodThreshold(-1.0);
   slam_proc_->setOSigmaGain(3.0);
   slam_proc_->setResampleThreshold(resample_th_);
+  slam_proc_->setUseGmapping(use_gmapping_);
 
   // Set scan matcher params
 

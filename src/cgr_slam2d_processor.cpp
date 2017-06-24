@@ -66,12 +66,23 @@ void CgrSlam2DProcessor::resetAndBuildParticles() {
     // we use the root directly
     particles_.back().node_= node;
   }
+
+  // Create Cache for CGR SLAM
+  q0.clear();
+  q0_lik.clear();
+  qr.clear();
+  qr_lik.clear();
+  q0.resize(num_particles_, Pose2D(0,0,0));
+  qr.resize(num_particles_, Pose2D(0,0,0));
+  q0_lik.resize(num_particles_, 0.0);
+  qr_lik.resize(num_particles_, 0.0);
 }
 
 void CgrSlam2DProcessor::setMatchingParameters (double urange, double range, double sigma, int kernsize, double lopt, double aopt,
                                                int iterations, double likelihoodSigma, unsigned int likelihoodSkip){
   //m_obsSigmaGain=likelihoodGain;
   matcher_.setMatchingParameters(urange, range, sigma, kernsize, lopt, aopt, iterations, likelihoodSigma, likelihoodSkip);
+  max_icp_iter_ = iterations;
 }
 
 void CgrSlam2DProcessor::setLaserConfig(LaserScanSensor *laser) {
@@ -117,11 +128,13 @@ bool CgrSlam2DProcessor::processReading(Scan &reading) {
 
   // Draw sample for every incoming scan
   //write the state of the reading and update all the particles using the motion model
-  for (ParticleVector::iterator it = particles_.begin(); it != particles_.end(); it++) {
-    Pose2D &pose(it->pose_);
-    pose = motion_model_.drawFromMotionEKFLinearized(it->pose_, relPose, odom_pose_);
+  if(!true_diff_drive_motion_model_) {
+    for (ParticleVector::iterator it = particles_.begin(); it != particles_.end(); it++) {
+      // CGR: Predict Step type 1
+      Pose2D &pose(it->pose_);
+      pose = motion_model_.drawFromMotionEKFLinearized(it->pose_, relPose, odom_pose_);
+    }
   }
-
 
   // accumulate the robot translation and rotation
   Pose2D move = relPose - odom_pose_;
@@ -144,6 +157,7 @@ bool CgrSlam2DProcessor::processReading(Scan &reading) {
       || acc_angular_distance_ >= angular_update_dist_th_
       || (temporal_update_time_th_ >= 0.0 && (reading.getTime() - last_update_time_) > temporal_update_time_th_)) {
     last_update_time_ = reading.getTime();
+
     //this is for converting the reading in a scan-matcher feedable form
     assert(reading.size() == num_laser_beams_);
     double *plainReading = new double[num_laser_beams_];
@@ -158,11 +172,30 @@ bool CgrSlam2DProcessor::processReading(Scan &reading) {
                  reading.getTime());
 
     if (is_first_scan_received_) {
-      // MAIN UPDATE PROCEDURE
-      scanMatch(plainReading);
-      updateTreeWeights(false);
+      if(use_gmapping_){
+        // Gmapping Algorithm
+        scanMatch(plainReading);
+        updateTreeWeights(false);
+        resample(plainReading, false, reading_copy);
+      }
+      else{
+        // Corrective Gradient Refinement Algorithm
+        LOGPRINT_ERROR("CGR NOT IMPLEMENTED!");
+        LOGASSERT_MSG(use_gmapping_, "CGR NOT IMPLEMENTED!");
+        // TODO -- if Use True motion model, the pose must be  drawn only when update (here), Or do normal EKF update procedure other wise
+        if(true_diff_drive_motion_model_){
+          // CGR: Predict Step type 2
+          LOGPRINT_ERROR("True Motion Model not Implemented!");
+          LOGASSERT_MSG(!true_diff_drive_motion_model_, "True Motion Model not Implemented!");
+        }
 
-      resample(plainReading, false, reading_copy);
+        // CGR: Refine & Acceptance Test Step
+        performRefineAndAccept(plainReading);
+        // Will use Selective Resampling from Gmapping
+        updateTreeWeights(false);
+        resample(plainReading, false, reading_copy);
+      }
+
 
     } else {
 
@@ -603,5 +636,44 @@ int CgrSlam2DProcessor::getBestParticleIndex() const{
       bi=i;
     }
   return (int) bi;
+}
+
+// Corrective Gradient Refinement Related
+
+void CgrSlam2DProcessor::performRefineAndAccept(const double *plainReading) {
+
+  // CGR REFINE STEP
+  for(int i=0; i < particles_.size(); i++){ // For each particle
+    Pose2D last_pose = particles_[i].pose_;
+    Pose2D out_pose(0,0,0);
+    double icp_err = 0.;
+    //q0_lik[i] = matcher_.score(particles_[i].map_, last_pose, plainReading);
+    double score=0.0, lik=0.0;
+    matcher_.likelihoodAndScore(score, lik, particles_[i].map_, last_pose, plainReading);
+    q0_lik[i] = lik;
+    q0[i] = particles_[i].pose_;
+
+    for(int j=0; j < max_icp_iter_; j++){
+      // TODO -- Can select between linear or non linear
+      icp_err = matcher_.icpStep(out_pose, particles_[i].map_, last_pose, plainReading);
+      // TODO -- Collect Cache to check convergence
+    }
+    qr[i] = out_pose;
+    score = 0.0; lik=0.0;
+    matcher_.likelihoodAndScore(score, lik, particles_[i].map_, out_pose, plainReading);
+    qr_lik[i] = lik;
+
+    // CGR Acceptance Test and Compute Active Map Area
+    if (qr_lik[i] > q0_lik[i]){
+      particles_[i].pose_ = out_pose;
+    }
+    else{
+      LOGPRINT_WARN("Particle %d: Acceptance Test fail, trust Odom", i);
+    }
+
+    matcher_.invalidateActiveArea();
+    matcher_.computeActiveArea(particles_[i].map_, particles_[i].pose_, plainReading);
+  }
+
 }
 

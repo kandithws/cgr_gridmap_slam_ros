@@ -30,6 +30,7 @@
 #include <map>
 #include "param_macros.h"
 #include "motion_model.h"
+#include "cgr_scan_matcher.h"
 
 
 
@@ -41,18 +42,6 @@ typedef GMapping::OrientedPoint Pose2D;
 typedef GMapping::OdometrySensor OdomSensor;
 typedef GMapping::Map<GMapping::PointAccumulator, GMapping::HierarchicalArray2D<GMapping::PointAccumulator > > HMap2D;
 
-class MotionModel{
- public:
-  MotionModel();
-  void setParams(double srr, double srt, double str, double stt);
-  GMapping::OrientedPoint drawFromMotion();
-  GMapping::OrientedPoint drawFromMotionEKFLinearized(const Pose2D& p, const Pose2D& pnew, const Pose2D& pold);
- private:
-  double srr_;
-  double srt_;
-  double str_;
-  double stt_;
-};
 
 class CgrSlam2DProcessor{
    public:
@@ -177,7 +166,8 @@ class CgrSlam2DProcessor{
     MotionModel motion_model_;
 
    private:
-    void performRefineGradient();
+    //void copyFirstStageProposal();
+    void performRefineAndAccept(const double* plainReading);
     void performUpdate();
     void performResample();
     void scanMatch(const double* plainReading);
@@ -192,7 +182,7 @@ class CgrSlam2DProcessor{
     double propagateWeight(TrajectoryNode* n, double weight);
     double propagateWeights();
     /**the scanmatcher algorithm*/
-    GMapping::ScanMatcher matcher_;
+    CgrScanMatcher matcher_;
 
     /*Private Use variables*/
     bool is_first_scan_received_ = false;
@@ -204,6 +194,12 @@ class CgrSlam2DProcessor{
     std::vector<unsigned int> indexes_;
     /**the particle weights (internally used)*/
     std::vector<double> weights_;
+
+    /*CGR Refine step poses Cache, for debug*/
+    std::vector<Pose2D> q0;
+    std::vector<double> q0_lik;
+    std::vector<Pose2D> qr;
+    std::vector<double > qr_lik;
 
     Pose2D odom_pose_;
     Pose2D last_part_pose_;
@@ -228,6 +224,11 @@ class CgrSlam2DProcessor{
     CGR_PARAM(DistanceThresholdCheck, dist_th_check, double, 20.0) // Max move per frame
     CGR_PARAM(OSigmaGain, o_sigma_gain, double, 3.0)
     CGR_PARAM(MinimumMatchingScore, minimum_score, double, 50.0)
+    CGR_PARAM(UseGmapping, use_gmapping, bool, false)
+    CGR_PARAM(MaxIcpIteration, max_icp_iter, int, 5)
+    // Use the original version of Motion Model of Odometry Model (from Probabilistic Robotics)
+    // Or use EKFLinearlized version (Gmapping) instead
+    CGR_PARAM(UseTrueDiffDriveMotionModel, true_diff_drive_motion_model, bool, false)
     CGR_MEMBER_VAR_PARAM(matcher_, generateMap, bool)
 
   };

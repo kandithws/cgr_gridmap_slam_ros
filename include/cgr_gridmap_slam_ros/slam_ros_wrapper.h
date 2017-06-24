@@ -21,7 +21,7 @@
 #include <tf/message_filter.h>
 #include "cgr_slam2d_processor.h"
 
-//#define ENABLE_MAP_RENDERER_THREAD
+#define ENABLE_MAP_RENDERER_THREAD
 
 class SlamRosWrapper{
  public:
@@ -93,6 +93,7 @@ class SlamRosWrapper{
   double occ_thresh_;
   double resample_th_;
   bool force_render_ = false;
+  bool use_gmapping_;
 
 
   // CGR Params

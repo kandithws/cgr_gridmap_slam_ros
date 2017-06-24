@@ -35,6 +35,8 @@ find_package(Eigen3 REQUIRED)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
     CATKIN_DEPENDS roscpp tf std_msgs nav_msgs sensor_msgs openslam_gmapping
+        LIBRARIES cgr_slam2d_processor
+        INCLUDE_DIRS include
 )
 
 ###########
@@ -44,15 +46,13 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
-include_directories(include/cgr_gridmap_slam_ros 
-                    ${catkin_INCLUDE_DIRS}
-                    ${EIGEN3_INCLUDE_DIR})
+include_directories(include/cgr_gridmap_slam_ros ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR})
 
 
 set(CGR_SLAM_LIB_FILES
         src/cgr_slam2d_processor.cpp
         src/motion_model.cpp
-        )
+        src/cgr_scan_matcher.cpp)
 
 # For clion
 set(SOURCE_FILES
@@ -66,7 +66,7 @@ set(SOURCE_FILES
 
 
 
-add_library(cgr_slam2d_processor ${CGR_SLAM_LIB_FILES})
+add_library(cgr_slam2d_processor src/motion_model.cpp src/cgr_scan_matcher.cpp src/cgr_slam2d_processor.cpp )
 target_link_libraries(cgr_slam2d_processor ${catkin_LIBRARIES})
 
 add_executable(cgr_gridmap_slam_node nodes/slam_ros_wrapper.cpp nodes/slam_node.cpp)
@@ -79,8 +79,9 @@ install( TARGETS
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
         )
 
-install(DIRECTORY include/cgr_gridmap_slam_ros/
+install(DIRECTORY include/${PROJECT_NAME}/
         DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+        FILES_MATCHING PATTERN "*.h" PATTERN ".svn" EXCLUDE
         )
 
 

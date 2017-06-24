@@ -6,6 +6,7 @@
 #define CGR_GRIDMAP_SLAM_ROS_PRINT_UTILS_MACRO_H_H
 
 #include <stdio.h>
+#include <cassert>
 
 #define PREFIX_INFO "[LOG INFO]: "
 #define PREFIX_WARN "[LOG WARN]: "
@@ -23,5 +24,9 @@
 #define LOGPRINT_WARN(MSG, ...) printf(ANSI_COLOR_YELLOW PREFIX_WARN MSG ANSI_COLOR_RESET, ##__VA_ARGS__)
 #define LOGPRINT_ERROR(MSG, ...) printf(ANSI_COLOR_RED PREFIX_ERROR MSG ANSI_COLOR_RESET, ##__VA_ARGS__)
 #define LOGPRINT_DEBUG(MSG, ...) printf(ANSI_COLOR_CYAN PREFIX_DEBUG MSG ANSI_COLOR_RESET, ##__VA_ARGS__)
+
+#define LOGASSERT(expr) assert(expr)
+#define LOGASSERT_MSG(expr, msg) assert((expr) && (msg))
+
 
 #endif //CGR_GRIDMAP_SLAM_ROS_PRINT_UTILS_MACRO_H_H
