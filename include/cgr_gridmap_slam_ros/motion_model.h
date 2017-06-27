@@ -8,8 +8,8 @@
 #include <map>
 #include <gmapping/utils/point.h>
 #include <boost/shared_ptr.hpp>
-#include "print_utils_macros.h"
-#include "math_utils.h"
+#include "utils/print_utils_macros.h"
+#include "utils/math_utils.h"
 
 
 

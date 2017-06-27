@@ -2,6 +2,8 @@
 // Created by kandithws on 24/6/2560.
 //
 
+#include <limits>
+#include <utils/print_utils_macros.h>
 #include "cgr_scan_matcher.h"
 
 namespace cgr_slam {
@@ -75,12 +77,21 @@ namespace cgr_slam {
     Pose2D result(0,0,0);
     // double icpError=icpNonlinearStep(result,pairs);
     double icpError=GMapping::icpStep(result,pairs);
-    std::cerr << "result(" << pairs.size() << ")=" << result.x << " " << result.y << " " << result.theta << std::endl;
-    pret.x=p.x+result.x;
-    pret.y=p.y+result.y;
-    pret.theta=p.theta+result.theta;
-    pret.theta=atan2(sin(pret.theta), cos(pret.theta));
+    //std::cerr << "result(" << pairs.size() << ")=" << result.x << " " << result.y << " " << result.theta << std::endl;
+
+    if (isnan(result.x) || isnan(result.y)) {
+      icpError = std::numeric_limits<double>::infinity();
+      LOGPRINT_DEBUG("Linear-ICP Diverge, point pairs=%ld", pairs.size());
+    }
+    else{
+      pret.x=p.x+result.x;
+      pret.y=p.y+result.y;
+      pret.theta=p.theta+result.theta;
+      pret.theta=atan2(sin(pret.theta), cos(pret.theta));
+    }
+
     // return score(map, p, readings);
+
     return icpError;
   }
 
@@ -148,11 +159,17 @@ namespace cgr_slam {
     Pose2D result(0,0,0);
     double icpError=GMapping::icpNonlinearStep(result,pairs);
 
-    std::cerr << "result(" << pairs.size() << ")=" << result.x << " " << result.y << " " << result.theta << std::endl;
-    pret.x=p.x+result.x;
-    pret.y=p.y+result.y;
-    pret.theta=p.theta+result.theta;
-    pret.theta=atan2(sin(pret.theta), cos(pret.theta));
+    //std::cerr << "result(" << pairs.size() << ")=" << result.x << " " << result.y << " " << result.theta << std::endl;
+    if (isnan(result.x) || isnan(result.y)) {
+      icpError = std::numeric_limits<double>::infinity();
+      LOGPRINT_DEBUG("Non Linear-ICP Diverge, point pairs=%ld", pairs.size());
+    }
+    else{
+      pret.x=p.x+result.x;
+      pret.y=p.y+result.y;
+      pret.theta=p.theta+result.theta;
+      pret.theta=atan2(sin(pret.theta), cos(pret.theta));
+    }
     // return score(map, p, readings);
     return icpError;
   }

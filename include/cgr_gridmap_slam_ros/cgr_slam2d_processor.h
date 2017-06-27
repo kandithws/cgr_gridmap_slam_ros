@@ -28,7 +28,7 @@
 #include <vector>
 #include <deque>
 #include <map>
-#include "param_macros.h"
+#include "utils/param_macros.h"
 #include "motion_model.h"
 #include "cgr_scan_matcher.h"
 
@@ -167,6 +167,7 @@ class CgrSlam2DProcessor{
 
    private:
     //void copyFirstStageProposal();
+    void performPredictStep(Pose2D& relPose);
     void performRefineAndAccept(const double* plainReading);
     void performUpdate();
     void performResample();
@@ -183,6 +184,7 @@ class CgrSlam2DProcessor{
     double propagateWeights();
     /**the scanmatcher algorithm*/
     CgrScanMatcher matcher_;
+
 
     /*Private Use variables*/
     bool is_first_scan_received_ = false;
@@ -229,6 +231,10 @@ class CgrSlam2DProcessor{
     // Use the original version of Motion Model of Odometry Model (from Probabilistic Robotics)
     // Or use EKFLinearlized version (Gmapping) instead
     CGR_PARAM(UseTrueDiffDriveMotionModel, true_diff_drive_motion_model, bool, false)
+    CGR_PARAM(NonLinearICP, non_linear_icp, bool, false)
+    // Decide whether to update motion for every incoming sensor data
+    // Original Gmapping Behaviour is true
+    CGR_PARAM(UpdateMotionFrequent, update_motion_frequent, bool, true)
     CGR_MEMBER_VAR_PARAM(matcher_, generateMap, bool)
 
   };

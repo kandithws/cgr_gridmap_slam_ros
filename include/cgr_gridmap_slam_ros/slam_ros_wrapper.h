@@ -14,6 +14,7 @@
 #include <nav_msgs/MapMetaData.h>
 #include <nav_msgs/GetMap.h>
 #include <std_msgs/Float64.h>
+#include <geometry_msgs/PoseArray.h>
 #include <message_filters/subscriber.h>
 #include <tf/tf.h>
 #include <tf/transform_broadcaster.h>
@@ -48,6 +49,7 @@ class SlamRosWrapper{
   ros::Publisher entropy_publisher_;
   ros::Publisher sst_;
   ros::Publisher sstm_;
+  ros::Publisher traj_pub_; // Best Particle Trajectory Publisher
   ros::AsyncSpinner spinner_;
   tf::TransformListener tf_;
   boost::mutex tf_map_to_odom_mutex_;
@@ -68,6 +70,7 @@ class SlamRosWrapper{
   boost::shared_ptr<tf::MessageFilter<sensor_msgs::LaserScan> > scan_filter_;
   nav_msgs::GetMap::Response map_;
 
+  geometry_msgs::PoseArray traj_cache_;
   // ROS Node Params
   double tf_publish_period_;
   std::string map_frame_;
@@ -94,6 +97,8 @@ class SlamRosWrapper{
   double resample_th_;
   bool force_render_ = false;
   bool use_gmapping_;
+  bool non_linear_icp_;
+  bool draw_motion_frequent_;
 
 
   // CGR Params

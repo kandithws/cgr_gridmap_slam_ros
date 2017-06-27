@@ -128,13 +128,9 @@ bool CgrSlam2DProcessor::processReading(Scan &reading) {
 
   // Draw sample for every incoming scan
   //write the state of the reading and update all the particles using the motion model
-  if(!true_diff_drive_motion_model_) {
-    for (ParticleVector::iterator it = particles_.begin(); it != particles_.end(); it++) {
-      // CGR: Predict Step type 1
-      Pose2D &pose(it->pose_);
-      pose = motion_model_.drawFromMotionEKFLinearized(it->pose_, relPose, odom_pose_);
-    }
-  }
+  // CGR/GMapping: Particle Filter Predict Step
+  if(update_motion_frequent_)
+    performPredictStep(relPose);
 
   // accumulate the robot translation and rotation
   Pose2D move = relPose - odom_pose_;
@@ -171,31 +167,23 @@ bool CgrSlam2DProcessor::processReading(Scan &reading) {
                  static_cast<const LaserScanSensor*>(reading.getSensor()),
                  reading.getTime());
 
+
+    if(!update_motion_frequent_)
+      performPredictStep(relPose);
+
     if (is_first_scan_received_) {
       if(use_gmapping_){
         // Gmapping Algorithm
         scanMatch(plainReading);
-        updateTreeWeights(false);
-        resample(plainReading, false, reading_copy);
       }
       else{
         // Corrective Gradient Refinement Algorithm
-        LOGPRINT_ERROR("CGR NOT IMPLEMENTED!");
-        LOGASSERT_MSG(use_gmapping_, "CGR NOT IMPLEMENTED!");
-        // TODO -- if Use True motion model, the pose must be  drawn only when update (here), Or do normal EKF update procedure other wise
-        if(true_diff_drive_motion_model_){
-          // CGR: Predict Step type 2
-          LOGPRINT_ERROR("True Motion Model not Implemented!");
-          LOGASSERT_MSG(!true_diff_drive_motion_model_, "True Motion Model not Implemented!");
-        }
-
         // CGR: Refine & Acceptance Test Step
         performRefineAndAccept(plainReading);
-        // Will use Selective Resampling from Gmapping
-        updateTreeWeights(false);
-        resample(plainReading, false, reading_copy);
       }
-
+      // Will use Selective Resampling from Gmapping
+      updateTreeWeights(false);
+      resample(plainReading, false, reading_copy);
 
     } else {
 
@@ -233,6 +221,22 @@ bool CgrSlam2DProcessor::processReading(Scan &reading) {
   }
   //m_readingCount++;
   return processed;
+}
+
+void CgrSlam2DProcessor::performPredictStep(Pose2D& relPose) {
+  if(true_diff_drive_motion_model_) {
+    //LOGPRINT_DEBUG("TRUE DIFF DRIVE*******");
+    for (ParticleVector::iterator it = particles_.begin(); it != particles_.end(); it++) {
+      Pose2D &pose(it->pose_);
+      pose = motion_model_.drawFromMotionTrueModel(it->pose_, relPose, odom_pose_);
+    }
+  }
+  else{
+    for (ParticleVector::iterator it = particles_.begin(); it != particles_.end(); it++) {
+      Pose2D &pose(it->pose_);
+      pose = motion_model_.drawFromMotionEKFLinearized(it->pose_, relPose, odom_pose_);
+    }
+  }
 }
 
 
@@ -654,12 +658,26 @@ void CgrSlam2DProcessor::performRefineAndAccept(const double *plainReading) {
     q0[i] = particles_[i].pose_;
 
     for(int j=0; j < max_icp_iter_; j++){
-      // TODO -- Can select between linear or non linear
-      icp_err = matcher_.icpStep(out_pose, particles_[i].map_, last_pose, plainReading);
+
+      if(non_linear_icp_)
+        icp_err = matcher_.computeIcpNonLinearStep(out_pose, particles_[i].map_, last_pose, plainReading);
+      else
+        icp_err = matcher_.computeIcpLinearStep(out_pose, particles_[i].map_, last_pose, plainReading);
       // TODO -- Collect Cache to check convergence
+      if (icp_err == std::numeric_limits<double>::infinity()){
+        LOGPRINT_WARN("Particle %d will not converge -- Break & use latest pose", i);
+        out_pose = last_pose;
+        break;
+      }
+      else{
+        last_pose = out_pose;
+      }
+
     }
+    LOGPRINT_DEBUG("Particle %d: Final ICP Error=%lf", i, icp_err);
     qr[i] = out_pose;
     score = 0.0; lik=0.0;
+    // TODO -- GMapping Uses log likelihood -> we might have to change to normalized real likelihood for algorithm eval
     matcher_.likelihoodAndScore(score, lik, particles_[i].map_, out_pose, plainReading);
     qr_lik[i] = lik;
 
@@ -670,6 +688,9 @@ void CgrSlam2DProcessor::performRefineAndAccept(const double *plainReading) {
     else{
       LOGPRINT_WARN("Particle %d: Acceptance Test fail, trust Odom", i);
     }
+    LOGPRINT_DEBUG("Particle %d: Acceptance Ratio r_%d=%lf, qr_likelihood=%lf, q0_likelihood=%lf", i,
+                   i, std::min(1.0,qr_lik[i]/q0_lik[i]), qr_lik[i], q0_lik[i]);
+
 
     matcher_.invalidateActiveArea();
     matcher_.computeActiveArea(particles_[i].map_, particles_[i].pose_, plainReading);

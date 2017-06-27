@@ -17,7 +17,8 @@ SlamRosWrapper::SlamRosWrapper():
   entropy_publisher_ = pnh_.advertise<std_msgs::Float64>("entropy", 1, true);
   sst_ = nh_.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
   sstm_ = nh_.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
-
+  traj_pub_ = nh_.advertise<geometry_msgs::PoseArray>("best_particle_trajectory", 1, true);
+  traj_cache_.header.frame_id = map_frame_;
   // Init ROS Publisher/Subscriber
   scan_filter_sub_ = boost::shared_ptr<message_filters::Subscriber<sensor_msgs::LaserScan> >
       (new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, "scan", 5));
@@ -33,7 +34,6 @@ SlamRosWrapper::~SlamRosWrapper(){
   //TODO -- Destroy thread properly if first Scan is not received
   if(!is_first_scan_received_)
     wait_first_scan_signal_.notify_all();
-
 
   spinner_.stop();
   LOGPRINT_DEBUG("-- DONE SHUTDOWN CGR --");
@@ -284,7 +284,7 @@ void SlamRosWrapper::updateMap() {
   entropy.data = computePoseEntropy();
   if(entropy.data > 0.0)
     entropy_publisher_.publish(entropy);
-
+  traj_cache_.poses.clear();
   ROS_DEBUG("Trajectory tree:");
   for(cgr_slam::CgrSlam2DProcessor::TrajectoryNode* n = best.node_;
       n;
@@ -302,10 +302,16 @@ void SlamRosWrapper::updateMap() {
     matcher.invalidateActiveArea();
     matcher.computeActiveArea(smap, n->pose_, &((*n->reading_)[0]));
     matcher.registerScan(smap, n->pose_, &((*n->reading_)[0]));
+    geometry_msgs::Pose pose;
+    pose.position.x = n->pose_.x;
+    pose.position.y = n->pose_.y;
+    pose.orientation = tf::createQuaternionMsgFromYaw(n->pose_.theta);
+    traj_cache_.poses.push_back(pose);
   }
   // UnLock Slam Trajectory Data
   slam_mutex_.unlock();
-
+  traj_cache_.header.stamp = ros::Time::now();
+  traj_pub_.publish(traj_cache_);
 
   // the map may have expanded, so resize ros message as well
   if(map_.map.info.width != (unsigned int) smap.getMapSizeX() || map_.map.info.height != (unsigned int) smap.getMapSizeY()) {
@@ -501,13 +507,17 @@ void SlamRosWrapper::initProcessorInstance() {
   slam_nh.param("resample_threshold", resample_th_, 0.5);
   slam_nh.param("occ_threshold", occ_thresh_, 0.25);
   slam_nh.param("use_gmapping", use_gmapping_, true);
+  slam_nh.param("non_linear_icp", non_linear_icp_, false);
 
 
   // TODO -- Make Motion model setup More Dynamic
   ros::NodeHandle mm_nh(pnh_, "motion_model");
   std::string mm_type;
   double srr, srt, str, stt;
+  bool true_mm, update_frequent;
   mm_nh.param<std::string>("type", mm_type, "diff_drive");
+  mm_nh.param("true_motion_model", true_mm, false);
+  mm_nh.param("update_frequent", update_frequent, true);
   mm_nh.param("srr", srr, 0.1);
   mm_nh.param("srt", srt, 0.2);
   mm_nh.param("str", str, 0.1);
@@ -524,6 +534,17 @@ void SlamRosWrapper::initProcessorInstance() {
                  "Fail to Set Motion Model, Something Wrong!");
 
   ROS_ASSERT_MSG(slam_proc_, "Fail to Create Slam Processor Instance, Abort!");
+  slam_proc_->setUseGmapping(use_gmapping_);
+  slam_proc_->setNonLinearICP(non_linear_icp_);
+  slam_proc_->setUseTrueDiffDriveMotionModel(true_mm);
+  slam_proc_->setUpdateMotionFrequent(update_frequent);
+  if(non_linear_icp_) ROS_WARN("NON LINEAR ICP FOR CGR SLAM!!!!!!!");
+  if(use_gmapping_){
+    ROS_WARN("SLAM Algorithm = GMapping");
+  }
+  else{
+    ROS_WARN("SLAM Algorithm = Corrective Gradient Refinement SLAM");
+  }
 
 }
 

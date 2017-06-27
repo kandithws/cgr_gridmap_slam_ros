@@ -66,7 +66,7 @@ set(SOURCE_FILES
 
 
 
-add_library(cgr_slam2d_processor src/motion_model.cpp src/cgr_scan_matcher.cpp src/cgr_slam2d_processor.cpp )
+add_library(cgr_slam2d_processor src/motion_model.cpp src/cgr_scan_matcher.cpp src/cgr_slam2d_processor.cpp)
 target_link_libraries(cgr_slam2d_processor ${catkin_LIBRARIES})
 
 add_executable(cgr_gridmap_slam_node nodes/slam_ros_wrapper.cpp nodes/slam_node.cpp)
