@@ -8,7 +8,7 @@
 #include <gmapping/scanmatcher/smmap.h>
 #include <gmapping/scanmatcher/scanmatcher.h>
 #include <gmapping/scanmatcher/icp.h>
-
+#include "utils/param_macros.h"
 
 namespace cgr_slam{
   class CgrScanMatcher : public GMapping::ScanMatcher {
@@ -20,6 +20,22 @@ namespace cgr_slam{
     double computeIcpNonLinearStep(Pose2D & pret, const GMapping::ScanMatcherMap& map,
                                    const Pose2D& p, const double* readings);
 
+    protected:
+     void matchGreedyBeamEndPoint(std::list<GMapping::PointPair>& pairs,
+                                  const GMapping::ScanMatcherMap &map,
+                                  const Pose2D& p, const double *readings);
+
+     void matchBeamRayTrace(std::list<GMapping::PointPair>& pairs,
+                            const GMapping::ScanMatcherMap &map,
+                            const Pose2D& p, const double *readings);
+
+     private:
+      double calcMapRayHitRange(const GMapping::ScanMatcherMap &map, const Pose2D& laser_pose,
+                                const double& angle); // Return Meters to hit map cell
+
+    CGR_PARAM(ScanMatchKernelSize, sm_kern_size, int, 1)
+    CGR_PARAM(ScanMatchBeamSkip, sm_beam_skip, int, 0)
+    CGR_PARAM(UseRayTrace, use_ray_trace, bool, false)
   };
 }
 

@@ -8,7 +8,7 @@
         <param name="base_frame" value="base_link"/>
         <param name="map_render_interval" value="5.0"/>
         <param name="force_render" value="false"/>
-        <param name="slam/linear_update" value="0.5"/>
+        <param name="slam/linear_update" value="0.4"/>
         <param name="slam/angular_update" value="0.4"/>
         <param name="slam/particles" value="80"/>
         <param name="slam/x_map_min" value="-50.0"/>
@@ -16,7 +16,7 @@
         <param name="slam/y_map_min" value="-50.0"/>
         <param name="slam/y_map_max" value="50.0"/>
         <param name="slam/map_resol" value="0.05"/>
-        <param name="slam/occ_threshold" value="0.25"/>
+        <param name="slam/occ_threshold" value="0.5"/>
         <param name="slam/resample_threshold" value="0.5"/>
 
 
@@ -30,31 +30,33 @@
         <param name="laser/max_range" value="6.0"/>
         <param name="laser/max_usable_range" value="5.0"/>
 
-        <param name="slam/use_gmapping" value="true"/>
+        <param name="slam/use_gmapping" value="false"/>
 
         <!-- CGR -->
-        <!--
         <param name="slam/non_linear_icp" value="true"/>
         <param name="scanmatch/sigma" value="0.05"/>
-        <param name="scanmatch/kernel_size" value="2"/>
+        <param name="scanmatch/l_kernel_size" value="1"/>
+        <param name="scanmatch/sm_kernel_size" value="2"/>
         <param name="scanmatch/lstep" value="0.05"/>
         <param name="scanmatch/astep" value="0.05"/>
         <param name="scanmatch/iterations" value="10"/>
         <param name="scanmatch/lsigma" value="0.075"/>
-        <param name="scanmatch/lskip" value="5"/>
+        <param name="scanmatch/lskip" value="2"/>
+        <param name="scanmatch/smskip" value="20"/>
         <param name="scanmatch/minimum_score" value="50.0"/>
-        -->
+        <param name="scanmatch/use_raytrace" value="true"/>
 
         <!-- GMapping -->
+        <!--         
         <param name="scanmatch/sigma" value="0.05"/>
-        <param name="scanmatch/kernel_size" value="1"/>
+        <param name="scanmatch/l_kernel_size" value="1"/>
         <param name="scanmatch/lstep" value="0.05"/>
         <param name="scanmatch/astep" value="0.05"/>
         <param name="scanmatch/iterations" value="6"/>
         <param name="scanmatch/lsigma" value="0.075"/>
         <param name="scanmatch/lskip" value="0"/>
         <param name="scanmatch/minimum_score" value="50.0"/>
-
+        -->
     </node>
 
 </launch>

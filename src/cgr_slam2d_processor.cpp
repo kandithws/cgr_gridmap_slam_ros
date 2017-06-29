@@ -674,7 +674,7 @@ void CgrSlam2DProcessor::performRefineAndAccept(const double *plainReading) {
       }
 
     }
-    LOGPRINT_DEBUG("Particle %d: Final ICP Error=%lf", i, icp_err);
+    //LOGPRINT_DEBUG("Particle %d: Final ICP Error=%lf", i, icp_err);
     qr[i] = out_pose;
     score = 0.0; lik=0.0;
     // TODO -- GMapping Uses log likelihood -> we might have to change to normalized real likelihood for algorithm eval
@@ -688,8 +688,8 @@ void CgrSlam2DProcessor::performRefineAndAccept(const double *plainReading) {
     else{
       LOGPRINT_WARN("Particle %d: Acceptance Test fail, trust Odom", i);
     }
-    LOGPRINT_DEBUG("Particle %d: Acceptance Ratio r_%d=%lf, qr_likelihood=%lf, q0_likelihood=%lf", i,
-                   i, std::min(1.0,qr_lik[i]/q0_lik[i]), qr_lik[i], q0_lik[i]);
+    //LOGPRINT_DEBUG("Particle %d: Acceptance Ratio r_%d=%lf, qr_likelihood=%lf, q0_likelihood=%lf", i,
+    //               i, std::min(1.0,qr_lik[i]/q0_lik[i]), qr_lik[i], q0_lik[i]);
 
 
     matcher_.invalidateActiveArea();

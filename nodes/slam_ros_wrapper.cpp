@@ -2,10 +2,11 @@
 
 #define MAP_IDX(sx, i, j) ((sx) * (j) + (i))
 
-SlamRosWrapper::SlamRosWrapper():
+SlamRosWrapper::SlamRosWrapper(bool test_mode):
   pnh_("~"),
   spinner_(1)
 {
+  if(test_mode) LOGPRINT_DEBUG("!!!!!!!!!!!!!!!!WE ARE IN TEST MODE!!!!!!!!!!!!!!!!!!!!!!");
   // --- ROS Node params --
   pnh_.param("tf_publish_period", tf_publish_period_, 0.05);
   pnh_.param<std::string>("map_frame", map_frame_, "map");
@@ -562,20 +563,28 @@ bool SlamRosWrapper::initProcessorParams() {
   ros::NodeHandle sm_nh_(pnh_, "scanmatch");
   // GMapping Original scanmatch
   double sm_sigma, sm_lstep, sm_astep, sm_lsigma, sm_min_score;
-  int sm_kernel_size,sm_iter, sm_lskip;
+  int l_kernel_size,sm_kernel_size,sm_iter, sm_skip, lskip;
+  bool sm_use_raytrace;
   sm_nh_.param("sigma",sm_sigma, 0.05);
-  sm_nh_.param("kernel_size", sm_kernel_size, 1);
+  sm_nh_.param("l_kernel_size", l_kernel_size, 1);
+  sm_nh_.param("sm_kernel_size", sm_kernel_size, 1);
   sm_nh_.param("lstep", sm_lstep, 0.05);
   sm_nh_.param("astep", sm_astep, 0.05);
   sm_nh_.param("iterations", sm_iter, 5);
   sm_nh_.param("lsigma", sm_lsigma, 0.075);
-  sm_nh_.param("lskip",sm_lskip, 0);
+  sm_nh_.param("lskip",lskip, 0);
+  sm_nh_.param("smskip",sm_skip, 0);
   sm_nh_.param("minimum_score", sm_min_score, 0.0);
+  sm_nh_.param("use_raytrace", sm_use_raytrace, false);
 
   slam_proc_->setMatchingParameters(laser_max_usable_range_, laser_max_range_,
-  sm_sigma, sm_kernel_size, sm_lstep, sm_astep, sm_iter, sm_lsigma, (unsigned int)sm_lskip);
+  sm_sigma, l_kernel_size, sm_lstep, sm_astep, sm_iter, sm_lsigma, (unsigned int)lskip);
   slam_proc_->setMinimumMatchingScore(sm_min_score);
   //TODO -- Set All SLAM Params to cgr_slam Processor instance
+  //HACK
+  slam_proc_->setUseRayTrace(sm_use_raytrace);
+  slam_proc_->setScanMatchKernelSize(sm_kernel_size);
+  slam_proc_->setScanMatchBeamSkip(sm_skip);
   /*
   gsp_->setMotionModelParameters(srr_, srt_, str_, stt_);
   gsp_->setUpdateDistances(linearUpdate_, angularUpdate_, resampleThreshold_);

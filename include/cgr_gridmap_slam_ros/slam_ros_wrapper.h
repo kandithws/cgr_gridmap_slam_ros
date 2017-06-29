@@ -26,7 +26,7 @@
 
 class SlamRosWrapper{
  public:
-  SlamRosWrapper();
+  SlamRosWrapper(bool test_mode=false);
   ~SlamRosWrapper();
   void executeNode();
   void laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan);

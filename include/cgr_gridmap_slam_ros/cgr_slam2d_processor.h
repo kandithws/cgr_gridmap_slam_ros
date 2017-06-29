@@ -236,6 +236,9 @@ class CgrSlam2DProcessor{
     // Original Gmapping Behaviour is true
     CGR_PARAM(UpdateMotionFrequent, update_motion_frequent, bool, true)
     CGR_MEMBER_VAR_PARAM(matcher_, generateMap, bool)
+    CGR_MEMBER_VAR_PARAM(matcher_, ScanMatchKernelSize, int)
+    CGR_MEMBER_VAR_PARAM(matcher_, ScanMatchBeamSkip, int)
+    CGR_MEMBER_VAR_PARAM(matcher_, UseRayTrace, bool)
 
   };
 
