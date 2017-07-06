@@ -9,7 +9,7 @@
 namespace cgr_slam {
 
   CgrScanMatcher::CgrScanMatcher() {
-
+    //m_fullnessThreshold = 0.25;
   }
 
   double CgrScanMatcher::computeIcpLinearStep(Pose2D &pret,
@@ -27,10 +27,11 @@ namespace cgr_slam {
 
     Pose2D result(0,0,0);
     // double icpError=icpNonlinearStep(result,pairs);
-    double icpError=GMapping::icpStep(result,pairs);
+    //double icpError=GMapping::icpStep(result,pairs);
+    double icpError=this->icpStep(result,pairs);
     //std::cerr << "result(" << pairs.size() << ")=" << result.x << " " << result.y << " " << result.theta << std::endl;
 
-    if (isnan(result.x) || isnan(result.y)) {
+    if (std::isnan(result.x) || std::isnan(result.y) || sqrt(result.x*result.x + result.y*result.y) > max_allow_distance_ ) {
       icpError = std::numeric_limits<double>::infinity();
       LOGPRINT_DEBUG("Linear-ICP Diverge, point pairs=%ld", pairs.size());
     }
@@ -59,10 +60,11 @@ namespace cgr_slam {
     }
 
     Pose2D result(0,0,0);
-    double icpError=GMapping::icpNonlinearStep(result,pairs);
+    //double icpError=GMapping::icpNonlinearStep(result,pairs);
+    double icpError=this->icpNonlinearStep(result,pairs);
 
     //std::cerr << "result(" << pairs.size() << ")=" << result.x << " " << result.y << " " << result.theta << std::endl;
-    if (isnan(result.x) || isnan(result.y)) {
+    if (std::isnan(result.x) || std::isnan(result.y) || sqrt(result.x*result.x + result.y*result.y) > max_allow_distance_) {
       icpError = std::numeric_limits<double>::infinity();
       LOGPRINT_DEBUG("Non Linear-ICP Diverge, point pairs=%ld", pairs.size());
     }
@@ -74,6 +76,28 @@ namespace cgr_slam {
     }
     // return score(map, p, readings);
     return icpError;
+  }
+
+  double CgrScanMatcher::computeGeneralizedICP(Pose2D &pret,
+                                               const GMapping::ScanMatcherMap &map,
+                                               const Pose2D &p,
+                                               const double *readings) {
+    // USE Non-linear grad of MRPT (Generalized)-ICP to solve
+    mrpt::maps::CSimplePointsMap particle_map, reading_map;
+
+    matchBeamRayTrace(particle_map, reading_map, map, p, readings);
+    /*
+    if (use_ray_trace_) {
+      // matchBeamRayTrace(pairs, map, p, readings);
+      matchBeamRayTrace(particle_map, reading_map, map, p, readings);
+    }
+    else{
+      // matchGreedyBeamEndPoint(pairs, map, p, readings);
+      matchGreedyBeamEndPoint(particle_map, reading_map, map, p, readings);
+    }
+    */
+
+    return 0.0;
   }
 
 
@@ -95,7 +119,7 @@ namespace cgr_slam {
       skip++;
       //skip=skip>m_likelihoodSkip?0:skip;
       skip=skip>sm_beam_skip_?0:skip;
-      if (*r>m_usableRange||*r==0.0) continue;
+      if (*r>m_usableRange||*r==0.0 || std::isnan(*r)) continue;
       if (skip) continue;
       GMapping::Point phit=lp;
       phit.x+=*r*cos(lp.theta+*angle);
@@ -144,11 +168,85 @@ namespace cgr_slam {
 
   }
 
+  void CgrScanMatcher::matchGreedyBeamEndPoint(mrpt::maps::CSimplePointsMap &particle_map,
+                                               mrpt::maps::CSimplePointsMap &reading_map,
+                                               const GMapping::ScanMatcherMap &map,
+                                               const Pose2D &p,
+                                               const double *readings) {
+
+    const double * angle=m_laserAngles+m_initialBeamsSkip;
+    Pose2D lp=p;
+    lp.x+=cos(p.theta)*m_laserPose.x-sin(p.theta)*m_laserPose.y;
+    lp.y+=sin(p.theta)*m_laserPose.x+cos(p.theta)*m_laserPose.y;
+    lp.theta+=m_laserPose.theta;
+    unsigned int skip=0;
+    double freeDelta=map.getDelta()*m_freeCellRatio;
+    //std::list<GMapping::PointPair> pairs;
+    //mrpt::obs::CObservation2DRangeScan scan1;
+    //float tmp[]
+    //const std::vector<char> validity(m_laserBeams, 1);
+    //scan1.loadFromVectors(m_laserBeams, readings, &validity[0]);
+
+    for (const double* r=readings+m_initialBeamsSkip; r<readings+m_laserBeams; r++, angle++){
+      skip++;
+      //skip=skip>m_likelihoodSkip?0:skip;
+      skip=skip>sm_beam_skip_?0:skip;
+      if (*r>m_usableRange||*r==0.0 || std::isnan(*r)) continue;
+      if (skip) continue;
+      GMapping::Point phit=lp;
+      phit.x+=*r*cos(lp.theta+*angle);
+      phit.y+=*r*sin(lp.theta+*angle);
+      GMapping::IntPoint iphit=map.world2map(phit);
+      GMapping::Point pfree=lp;
+      pfree.x+=(*r-map.getDelta()*freeDelta)*cos(lp.theta+*angle);
+      pfree.y+=(*r-map.getDelta()*freeDelta)*sin(lp.theta+*angle);
+      pfree=pfree-phit;
+      GMapping::IntPoint ipfree=map.world2map(pfree);
+      bool found=false;
+      GMapping::Point bestMu(0.,0.);
+      GMapping::Point bestCell(0.,0.);
+      //for (int xx=-m_kernelSize; xx<=m_kernelSize; xx++)
+      for (int xx=-sm_kern_size_; xx<=sm_kern_size_; xx++)
+        //for (int yy=-m_kernelSize; yy<=m_kernelSize; yy++){
+        for (int yy=-sm_kern_size_; yy<=sm_kern_size_; yy++){
+          GMapping::IntPoint pr=iphit+GMapping::IntPoint(xx,yy);
+          GMapping::IntPoint pf=pr+ipfree;
+          //map.storage().isInside(pr);
+          //GMapping::AccessibilityState s=map.storage().cellState(pr);
+          //if (s&Inside && s&Allocated){
+          const GMapping::PointAccumulator& cell=map.cell(pr);
+          const GMapping::PointAccumulator& fcell=map.cell(pf);
+          if (((double)cell )> m_fullnessThreshold && ((double)fcell )<m_fullnessThreshold){
+            GMapping::Point mu=phit-cell.mean();
+            if (!found){
+              bestMu=mu;
+              bestCell=cell.mean();
+              found=true;
+            }else
+            if((mu*mu)<(bestMu*bestMu)){
+              bestMu=mu;
+              bestCell=cell.mean();
+            }
+
+          }
+          //}
+        }
+      if (found){
+        particle_map.insertPointFast(bestCell.x,bestCell.y);
+        reading_map.insertPointFast(phit.x,phit.y);
+        // pairs.push_back(std::make_pair(phit, bestCell));
+        //std::cerr << "(" << phit.x-bestCell.x << "," << phit.y-bestCell.y << ") ";
+
+      }
+      //std::cerr << std::endl;
+    }
+
+  }
+
   void CgrScanMatcher::matchBeamRayTrace(std::list<GMapping::PointPair> &pairs,
                                          const GMapping::ScanMatcherMap &map,
                                          const Pose2D &p,
                                          const double *readings) {
-    // TODO -- TEST
     //LOGPRINT_WARN("Ray Tracing, total skip: %d", sm_beam_skip_);
     const double * angle=m_laserAngles+m_initialBeamsSkip;
     Pose2D lp=p;
@@ -161,22 +259,75 @@ namespace cgr_slam {
       skip++;
       //skip=skip>m_likelihoodSkip?0:skip;
       skip = skip > sm_beam_skip_ ? 0 : skip;
-      if (*r > m_usableRange || *r == 0.0) continue;
+      if (*r > m_usableRange || *r == 0.0 || std::isnan(*r)) continue;
       if (skip) continue;
       double mu = calcMapRayHitRange(map, lp, *angle);
-      if(!isinf(mu)){
+      if(!std::isinf(mu)){
         GMapping::Point phit=lp;
         phit.x+=*r*cos(lp.theta+*angle);
         phit.y+=*r*sin(lp.theta+*angle);
         GMapping::Point bestCell=lp;
         bestCell.x+=mu*cos(lp.theta+*angle);
         bestCell.y+=mu*sin(lp.theta+*angle);
+        //LOGPRINT_INFO("RAYTRACE angle=%lf: laser=(%lf, %lf), besthit=(%lf, %lf)",*angle, phit.x, phit.y, bestCell.x, bestCell.y);
         pairs.push_back(std::make_pair(phit, bestCell));
       }
       else{
         // Not Match
       }
     }
+  }
+
+  void CgrScanMatcher::matchBeamRayTrace(mrpt::maps::CSimplePointsMap &particle_map,
+                                         mrpt::maps::CSimplePointsMap &reading_map,
+                                         const GMapping::ScanMatcherMap &map,
+                                         const Pose2D &p,
+                                         const double *readings) {
+
+    //LOGPRINT_WARN("Ray Tracing, total skip: %d", sm_beam_skip_);
+    const double * angle=m_laserAngles+m_initialBeamsSkip;
+    Pose2D lp=p;
+    lp.x+=cos(p.theta)*m_laserPose.x-sin(p.theta)*m_laserPose.y;
+    lp.y+=sin(p.theta)*m_laserPose.x+cos(p.theta)*m_laserPose.y;
+    lp.theta+=m_laserPose.theta;
+    unsigned int skip=0;
+    static int count = 0;
+    mrpt::maps::CSimplePointsMap debug_map;
+    // double freeDelta=map.getDelta()*m_freeCellRatio;
+    for (const double* r=readings+m_initialBeamsSkip; r<readings+m_laserBeams; r++, angle++) {
+      skip++;
+      //skip=skip>m_likelihoodSkip?0:skip;
+      skip = skip > sm_beam_skip_ ? 0 : skip;
+      if (*r > m_usableRange || *r == 0.0 || std::isnan(*r)) continue;
+      if (skip) continue;
+      double mu = calcMapRayHitRange(map, lp, *angle);
+      if(!std::isinf(mu)){
+        GMapping::Point phit=lp;
+        phit.x+=*r*cos(lp.theta+*angle);
+        phit.y+=*r*sin(lp.theta+*angle);
+        GMapping::Point bestCell=lp;
+        bestCell.x+=mu*cos(lp.theta+*angle);
+        bestCell.y+=mu*sin(lp.theta+*angle);
+        //LOGPRINT_INFO("RAYTRACE angle=%lf: laser=(%lf, %lf), besthit=(%lf, %lf)",*angle, phit.x, phit.y, bestCell.x, bestCell.y);
+        particle_map.insertPointFast(bestCell.x,bestCell.y);
+        reading_map.insertPointFast(phit.x,phit.y);
+        debug_map.insertPoint(bestCell.x,bestCell.y,0.0, 255, 0, 0);
+        debug_map.insertPoint(phit.x,phit.y,0.0, 0.0, 255, 0);
+      }
+      else{
+        // Not Match
+      }
+    }
+
+    //LOGPRINT_DEBUG("HELLO WORLDDDDD22222222222!");
+    char out_name[60];
+    sprintf(out_name, "/home/kandithws/Desktop/debug/debug_%d.ply", count);
+    //debug_map.savePCDFile(out_name, false);
+    debug_map.saveToPlyFile(out_name, false);
+    count++;
+    //LOGPRINT_DEBUG("HELLO WORLDDDDD33333333333!");
+    //LOGPRINT_ERROR("--------EXIT TO TEST MRPT------------");
+    //exit(-1);
   }
 
   double CgrScanMatcher::calcMapRayHitRange(const GMapping::ScanMatcherMap &map,
@@ -246,14 +397,14 @@ namespace cgr_slam {
       // TODO -- Change Occupancy Threshold to parameter
       const GMapping::PointAccumulator& cell=map.cell(y,x);
       // Map->scale (m/cell)
-      if(map.storage().isInside(y,x) || ((double)cell )> 0.5)
+      if(map.storage().isInside(y,x) || ((double)cell )> 0.25)
         return sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)) * map.getDelta();
     }
     else
     {
       //if(!MAP_VALID(map,x,y) || map->cells[MAP_INDEX(map,x,y)].occ_state > -1)
       const GMapping::PointAccumulator& cell=map.cell(x,y);
-      if(map.storage().isInside(x,y) || ((double)cell )> 0.5)
+      if(map.storage().isInside(x,y) || ((double)cell )> 0.25)
         return sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)) * map.getDelta();
     }
 
@@ -272,14 +423,14 @@ namespace cgr_slam {
         //if(!MAP_VALID(map,y,x) || map->cells[MAP_INDEX(map,y,x)].occ_state > -1)
         const GMapping::PointAccumulator& cell=map.cell(y,x);
         // Map->scale (m/cell)
-        if(map.storage().isInside(y,x) || ((double)cell )> 0.5)
+        if(map.storage().isInside(y,x) || ((double)cell )> 0.25)
           return sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)) * map.getDelta();
       }
       else
       {
         //if(!MAP_VALID(map,x,y) || map->cells[MAP_INDEX(map,x,y)].occ_state > -1)
         const GMapping::PointAccumulator& cell=map.cell(x,y);
-        if(map.storage().isInside(x,y) || ((double)cell )> 0.5)
+        if(map.storage().isInside(x,y) || ((double)cell )> 0.25)
           return sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)) * map.getDelta();
       }
     }

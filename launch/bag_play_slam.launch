@@ -1,0 +1,14 @@
+<launch>
+   
+    <param name="use_sim_time" value="true"/>
+    <node pkg="rosbag" type="play" name="player" args="--clock $(find bagfiles)/bags/turtlebot_long.bag" output="screen"/>
+   <!-- 
+    <include file="$(find cgr_gridmap_slam_ros)/launch/gmapping.launch"/>
+   --> 
+    <include file="$(find cgr_gridmap_slam_ros)/launch/cgr_slam.launch"/>
+    <include file="$(find cgr_gridmap_slam_ros)/launch/rviz.launch"/>
+    <!--
+    <node ns="log" pkg="rosbag" type="record" name="log_sensor"
+          args="-o log_data/slam_log /tf /tf_static /best_particle_trajectory /raw_odom_pose /cgr_slam/entropy"/>
+    -->
+</launch>

@@ -316,7 +316,7 @@ bool CgrSlam2DProcessor::resample(const double* plainReading, int adaptSize, con
   }
 
   if (m_neff<resample_th_*particles_.size()){
-    LOGPRINT_INFO("Resampling, current neff=%lf", m_neff);
+    LOGPRINT_ERROR("Resampling, current neff=%lf", m_neff);
 
     uniform_resampler<double, double> resampler;
     indexes_=resampler.resampleIndexes(weights_, adaptSize);
@@ -652,41 +652,55 @@ void CgrSlam2DProcessor::performRefineAndAccept(const double *plainReading) {
     Pose2D out_pose(0,0,0);
     double icp_err = 0.;
     //q0_lik[i] = matcher_.score(particles_[i].map_, last_pose, plainReading);
-    double score=0.0, lik=0.0;
-    matcher_.likelihoodAndScore(score, lik, particles_[i].map_, last_pose, plainReading);
+    double odom_score=0.0, lik=0.0;
+    matcher_.likelihoodAndScore(odom_score, lik, particles_[i].map_, last_pose, plainReading);
     q0_lik[i] = lik;
     q0[i] = particles_[i].pose_;
-
-    for(int j=0; j < max_icp_iter_; j++){
-
-      if(non_linear_icp_)
-        icp_err = matcher_.computeIcpNonLinearStep(out_pose, particles_[i].map_, last_pose, plainReading);
-      else
-        icp_err = matcher_.computeIcpLinearStep(out_pose, particles_[i].map_, last_pose, plainReading);
-      // TODO -- Collect Cache to check convergence
-      if (icp_err == std::numeric_limits<double>::infinity()){
-        LOGPRINT_WARN("Particle %d will not converge -- Break & use latest pose", i);
-        out_pose = last_pose;
-        break;
-      }
-      else{
-        last_pose = out_pose;
-      }
-
+    if(simple_gradient_) {
+      matcher_.optimize(out_pose, particles_[i].map_, last_pose, plainReading);
+      //matcher_.computeGeneralizedICP(out_pose, particles_[i].map_, last_pose, plainReading);
     }
+    else{
+      for(int j=0; j < max_icp_iter_; j++){
+
+        if(non_linear_icp_)
+          icp_err = matcher_.computeIcpNonLinearStep(out_pose, particles_[i].map_, last_pose, plainReading);
+        else
+          icp_err = matcher_.computeIcpLinearStep(out_pose, particles_[i].map_, last_pose, plainReading);
+        // TODO -- Collect Cache to check convergence
+        if (icp_err == std::numeric_limits<double>::infinity()){
+          LOGPRINT_WARN("Particle %d will not converge -- Break & use latest pose", i);
+          out_pose = last_pose;
+          break;
+        }
+        else{
+          last_pose = out_pose;
+        }
+
+      }
+    }
+
     //LOGPRINT_DEBUG("Particle %d: Final ICP Error=%lf", i, icp_err);
     qr[i] = out_pose;
-    score = 0.0; lik=0.0;
+    double score = 0.0; lik=0.0;
     // TODO -- GMapping Uses log likelihood -> we might have to change to normalized real likelihood for algorithm eval
     matcher_.likelihoodAndScore(score, lik, particles_[i].map_, out_pose, plainReading);
     qr_lik[i] = lik;
 
     // CGR Acceptance Test and Compute Active Map Area
+    //if (qr_lik[i] > q0_lik[i]){
     if (qr_lik[i] > q0_lik[i]){
       particles_[i].pose_ = out_pose;
+      particles_[i].weight_+=qr_lik[i];
+      particles_[i].weight_sum_+=qr_lik[i];
+      LOGPRINT_DEBUG("Particle %d: Pass Acceptance Test , SM result l_r=%lf, l_0=%lf, icp_err=%lf",
+                    i, qr_lik[i], q0_lik[i], icp_err);
     }
     else{
-      LOGPRINT_WARN("Particle %d: Acceptance Test fail, trust Odom", i);
+      LOGPRINT_WARN("Particle %d: Acceptance Test fail, trust Odom l_r=%lf, l_0=%lf, icp_err=%lf",
+                    i, qr_lik[i], q0_lik[i], icp_err);
+      particles_[i].weight_+=q0_lik[i];
+      particles_[i].weight_sum_+=q0_lik[i];
     }
     //LOGPRINT_DEBUG("Particle %d: Acceptance Ratio r_%d=%lf, qr_likelihood=%lf, q0_likelihood=%lf", i,
     //               i, std::min(1.0,qr_lik[i]/q0_lik[i]), qr_lik[i], q0_lik[i]);
@@ -694,7 +708,12 @@ void CgrSlam2DProcessor::performRefineAndAccept(const double *plainReading) {
 
     matcher_.invalidateActiveArea();
     matcher_.computeActiveArea(particles_[i].map_, particles_[i].pose_, plainReading);
+
+
   }
+
+  //LOGPRINT_ERROR("--------EXIT TO TEST MRPT------------");
+  //exit(-1);
 
 }
 

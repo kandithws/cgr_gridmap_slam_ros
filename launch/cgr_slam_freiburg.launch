@@ -7,38 +7,38 @@
         <param name="map_frame" value="map"/>
         <param name="odom_frame" value="odom"/>
         <!--param name="base_frame" value="base_link"/-->
-        <param name="base_frame" value="base_link"/>
+        <param name="base_frame" value="laser_link"/>
         <param name="map_render_interval" value="5.0"/>
         <param name="force_render" value="false"/>
-        <param name="slam/linear_update" value="0.4"/>
-        <param name="slam/angular_update" value="0.35"/>
-        <param name="slam/particles" value="5"/>
+        <param name="slam/linear_update" value="0.5"/>
+        <param name="slam/angular_update" value="0.5"/>
+        <param name="slam/particles" value="30"/>
         <param name="slam/x_map_min" value="-1.0"/>
         <param name="slam/x_map_max" value="1.0"/>
         <param name="slam/y_map_min" value="-1.0"/>
         <param name="slam/y_map_max" value="1.0"/>
-        <param name="slam/map_resol" value="0.05"/>
-        <param name="slam/occ_threshold" value="0.25"/>
+        <param name="slam/map_resol" value="0.30"/>
+        <param name="slam/occ_threshold" value="0.5"/>
         <param name="slam/resample_threshold" value="0.5"/>
 
 
-        <param name="motion_model/srr" value="0.01"/>
-        <param name="motion_model/srt" value="0.02"/>
-        <param name="motion_model/str" value="0.01"/>
-        <param name="motion_model/stt" value="0.02"/>
+        <param name="motion_model/srr" value="0.1"/>
+        <param name="motion_model/srt" value="0.2"/>
+        <param name="motion_model/str" value="0.1"/>
+        <param name="motion_model/stt" value="0.2"/>
         <param name="motion_model/true_motion_model" value="false"/>
         <param name="motion_model/update_frequent" value="true"/>
 
-        
+        <!--
         <param name="laser/max_range" value="6.0"/>
-        <param name="laser/max_usable_range" value="5.0"/>
-        
+        <param name="laser/max_usable_range" value="5.5"/>
+        -->
 
         <!-- SICK LMS : For CARMEN LOG Dataset-->
-        <!--
+
         <param name="laser/max_range" value="90.0"/>
         <param name="laser/max_usable_range" value="85.0"/>
-        -->
+
         <param name="slam/use_gmapping" value="false"/>
 
         <!-- CGR:RayTrace -->
@@ -49,7 +49,7 @@
         <param name="scanmatch/sm_kernel_size" value="2"/>
         <param name="scanmatch/lstep" value="0.05"/>
         <param name="scanmatch/astep" value="0.05"/>
-        <param name="scanmatch/iterations" value="10"/>
+        <param name="scanmatch/iterations" value="6"/>
         <param name="scanmatch/lsigma" value="0.075"/>
         <param name="scanmatch/lskip" value="0"/>
         <param name="scanmatch/smskip" value="0"/>
@@ -59,14 +59,14 @@
 
 
         <!-- CGR:Greedy -->
-        <param name="scanmatch/simple_gradient" value="false"/>
+        <param name="scanmatch/simple_gradient" value="true"/>
         <param name="slam/non_linear_icp" value="true"/>
         <param name="scanmatch/sigma" value="0.30"/>
         <param name="scanmatch/l_kernel_size" value="1"/>
-        <param name="scanmatch/sm_kernel_size" value="3"/>
+        <param name="scanmatch/sm_kernel_size" value="2"/>
         <param name="scanmatch/lstep" value="0.05"/>
         <param name="scanmatch/astep" value="0.05"/>
-        <param name="scanmatch/iterations" value="7"/>
+        <param name="scanmatch/iterations" value="10"/>
         <param name="scanmatch/lsigma" value="0.2"/>
         <param name="scanmatch/lskip" value="0"/>
         <param name="scanmatch/smskip" value="0"/>

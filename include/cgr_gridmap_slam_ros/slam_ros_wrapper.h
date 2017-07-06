@@ -71,6 +71,14 @@ class SlamRosWrapper{
   nav_msgs::GetMap::Response map_;
 
   geometry_msgs::PoseArray traj_cache_;
+
+  // Debuging Publisher
+  ros::Publisher odom_pose_pub_;
+  ros::Publisher slam_pose_pub_;
+  ros::Publisher slam_correction_pub_;
+  geometry_msgs::PoseStamped odom_pose_cache_;
+  geometry_msgs::PoseStamped slam_pose_cache_;
+  geometry_msgs::PoseStamped slam_correction_cache_;
   // ROS Node Params
   double tf_publish_period_;
   std::string map_frame_;

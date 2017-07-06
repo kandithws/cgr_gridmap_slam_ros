@@ -27,10 +27,17 @@ SlamRosWrapper::SlamRosWrapper(bool test_mode):
       (new tf::MessageFilter<sensor_msgs::LaserScan>(*scan_filter_sub_, tf_, odom_frame_, 5));
   scan_filter_->registerCallback(boost::bind(&SlamRosWrapper::laserCallback, this, _1));
 
+  // DEBUG -- PUBLISHER
+  odom_pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("/raw_odom_pose", 10, false);
+  //slam_pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("slam_pose", 10, false);
+  //slam_correction_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("slam_correction", 10, false);
+  odom_pose_cache_.header.frame_id = odom_frame_;
+  //slam_pose_cache_.header.frame_id = map_frame_;
+  //slam_correction_cache_.header.frame_id = map_frame_;
   initProcessorInstance();
 }
 
-SlamRosWrapper::~SlamRosWrapper(){
+ SlamRosWrapper::~SlamRosWrapper(){
   delete(laser_sensor_);
   //TODO -- Destroy thread properly if first Scan is not received
   if(!is_first_scan_received_)
@@ -186,11 +193,38 @@ void SlamRosWrapper::laserCallback(const sensor_msgs::LaserScan::ConstPtr &scan)
     tf::Transform laser_to_map = tf::Transform(tf::createQuaternionFromRPY(0, 0, mpose.theta), tf::Vector3(mpose.x, mpose.y, 0.0)).inverse();
     tf::Transform odom_to_laser = tf::Transform(tf::createQuaternionFromRPY(0, 0, odom_pose.theta), tf::Vector3(odom_pose.x, odom_pose.y, 0.0));
 
+
     {
       boost::mutex::scoped_lock lock(tf_map_to_odom_mutex_);
       tf_map_to_odom_ = (odom_to_laser * laser_to_map).inverse();
     }
 
+    // Publish odom when calculate pose
+    geometry_msgs::Pose odom_to_laser_msg;
+    tf::poseTFToMsg(odom_to_laser, odom_to_laser_msg);
+    odom_pose_cache_.pose = odom_to_laser_msg;
+    odom_pose_cache_.header.stamp = scan->header.stamp;
+    odom_pose_pub_.publish(odom_pose_cache_);
+
+    /*
+    // DEBUG POSE TO LASER FRAME
+    geometry_msgs::Pose map_to_laser_msg;
+    geometry_msgs::Pose odom_to_laser_msg;
+    geometry_msgs::Pose correction_msg;
+    tf::poseTFToMsg(laser_to_map.inverse(), map_to_laser_msg);
+    tf::poseTFToMsg(odom_to_laser, odom_to_laser_msg);
+    tf::poseTFToMsg(tf::Transform(tf::createQuaternionFromRPY(0, 0, mpose.theta - odom_pose.theta),
+                                  tf::Vector3(mpose.x - odom_pose.x, mpose.y - odom_pose.y, 0.0)), correction_msg);
+    odom_pose_cache_.pose = odom_to_laser_msg;
+    odom_pose_cache_.header.stamp = scan->header.stamp;
+    slam_pose_cache_.pose = map_to_laser_msg;
+    slam_pose_cache_.header.stamp = scan->header.stamp;
+    slam_correction_cache_.pose = correction_msg;
+    slam_correction_cache_.header.stamp = scan->header.stamp;
+    odom_pose_pub_.publish(odom_pose_cache_);
+    slam_pose_pub_.publish(slam_pose_cache_);
+    slam_correction_pub_.publish(slam_correction_cache_);
+    */
 
     if((scan->header.stamp - last_map_update_).toSec() > map_render_interval_)
     {
@@ -247,7 +281,8 @@ void SlamRosWrapper::mapRendererThread() {
 void SlamRosWrapper::updateMap() {
   ROS_DEBUG("Update map");
   boost::mutex::scoped_lock map_lock (map_mutex_);
-  GMapping::ScanMatcher matcher;
+  //GMapping::ScanMatcher matcher;
+  cgr_slam::CgrScanMatcher matcher;
 
   matcher.setLaserParameters(laser_total_beam_count_, &(laser_angles_[0]),
                              laser_sensor_->getPose());
@@ -418,7 +453,7 @@ bool SlamRosWrapper::initNodeFromFirstScan(const sensor_msgs::LaserScan &scan) {
   }
 
   laser_total_beam_count_ = scan.ranges.size();
-
+  LOGPRINT_DEBUG("TOTAL LASER BEAMS: %d", laser_total_beam_count_);
   double angle_center = (scan.angle_min + scan.angle_max)/2;
 
   if (up.z() > 0)
@@ -564,7 +599,7 @@ bool SlamRosWrapper::initProcessorParams() {
   // GMapping Original scanmatch
   double sm_sigma, sm_lstep, sm_astep, sm_lsigma, sm_min_score;
   int l_kernel_size,sm_kernel_size,sm_iter, sm_skip, lskip;
-  bool sm_use_raytrace;
+  bool sm_use_raytrace, simple_gradient;
   sm_nh_.param("sigma",sm_sigma, 0.05);
   sm_nh_.param("l_kernel_size", l_kernel_size, 1);
   sm_nh_.param("sm_kernel_size", sm_kernel_size, 1);
@@ -576,15 +611,20 @@ bool SlamRosWrapper::initProcessorParams() {
   sm_nh_.param("smskip",sm_skip, 0);
   sm_nh_.param("minimum_score", sm_min_score, 0.0);
   sm_nh_.param("use_raytrace", sm_use_raytrace, false);
+  sm_nh_.param("simple_gradient", simple_gradient, false);
 
   slam_proc_->setMatchingParameters(laser_max_usable_range_, laser_max_range_,
   sm_sigma, l_kernel_size, sm_lstep, sm_astep, sm_iter, sm_lsigma, (unsigned int)lskip);
   slam_proc_->setMinimumMatchingScore(sm_min_score);
+  slam_proc_->setMaxIcpIteration(sm_iter);
   //TODO -- Set All SLAM Params to cgr_slam Processor instance
-  //HACK
   slam_proc_->setUseRayTrace(sm_use_raytrace);
   slam_proc_->setScanMatchKernelSize(sm_kernel_size);
   slam_proc_->setScanMatchBeamSkip(sm_skip);
+
+  //TODO -- HACKKK FOR TEST, use GMapping SM!!!!!!
+  slam_proc_->setSimpleGradient(simple_gradient);
+
   /*
   gsp_->setMotionModelParameters(srr_, srt_, str_, stt_);
   gsp_->setUpdateDistances(linearUpdate_, angularUpdate_, resampleThreshold_);

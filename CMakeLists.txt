@@ -14,13 +14,17 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   tf
+        pcl_conversions
+        pcl_ros
+        mrpt_bridge
   openslam_gmapping
 )
 
 ## System dependencies are found with CMake's conventions
 find_package(Boost REQUIRED COMPONENTS system)
-# find_package(MRPT REQUIRED base obs gui slam)
+find_package(MRPT REQUIRED base obs gui slam)
 find_package(Eigen3 REQUIRED)
+
 
 
 
@@ -34,7 +38,7 @@ find_package(Eigen3 REQUIRED)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-    CATKIN_DEPENDS roscpp tf std_msgs nav_msgs sensor_msgs openslam_gmapping
+    CATKIN_DEPENDS roscpp tf std_msgs nav_msgs sensor_msgs openslam_gmapping mrpt_bridge
         LIBRARIES cgr_slam2d_processor
         INCLUDE_DIRS include
 )
@@ -66,8 +70,8 @@ set(SOURCE_FILES
 
 
 
-add_library(cgr_slam2d_processor src/motion_model.cpp src/cgr_scan_matcher.cpp src/cgr_slam2d_processor.cpp)
-target_link_libraries(cgr_slam2d_processor ${catkin_LIBRARIES})
+add_library(cgr_slam2d_processor src/motion_model.cpp src/cgr_scan_matcher.cpp src/cgr_slam2d_processor.cpp include/cgr_gridmap_slam_ros/impl/icp.hpp)
+target_link_libraries(cgr_slam2d_processor ${catkin_LIBRARIES} ${MRPT_LIBS} ${PCL_LIBRARIES})
 
 add_executable(cgr_gridmap_slam_node nodes/slam_ros_wrapper.cpp nodes/slam_node.cpp)
 target_link_libraries(cgr_gridmap_slam_node cgr_slam2d_processor ${catkin_LIBRARIES} ${Boost_LIBRARIES})

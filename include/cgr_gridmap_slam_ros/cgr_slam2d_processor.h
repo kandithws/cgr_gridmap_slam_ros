@@ -232,6 +232,7 @@ class CgrSlam2DProcessor{
     // Or use EKFLinearlized version (Gmapping) instead
     CGR_PARAM(UseTrueDiffDriveMotionModel, true_diff_drive_motion_model, bool, false)
     CGR_PARAM(NonLinearICP, non_linear_icp, bool, false)
+    CGR_PARAM(SimpleGradient, simple_gradient, bool, false)
     // Decide whether to update motion for every incoming sensor data
     // Original Gmapping Behaviour is true
     CGR_PARAM(UpdateMotionFrequent, update_motion_frequent, bool, true)
