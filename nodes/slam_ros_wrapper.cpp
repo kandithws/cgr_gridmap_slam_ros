@@ -22,9 +22,9 @@ SlamRosWrapper::SlamRosWrapper(bool test_mode):
   traj_cache_.header.frame_id = map_frame_;
   // Init ROS Publisher/Subscriber
   scan_filter_sub_ = boost::shared_ptr<message_filters::Subscriber<sensor_msgs::LaserScan> >
-      (new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, "scan", 5));
+      (new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, "scan", 10));
   scan_filter_ = boost::shared_ptr<tf::MessageFilter<sensor_msgs::LaserScan> >
-      (new tf::MessageFilter<sensor_msgs::LaserScan>(*scan_filter_sub_, tf_, odom_frame_, 5));
+      (new tf::MessageFilter<sensor_msgs::LaserScan>(*scan_filter_sub_, tf_, odom_frame_, 10));
   scan_filter_->registerCallback(boost::bind(&SlamRosWrapper::laserCallback, this, _1));
 
   // DEBUG -- PUBLISHER
@@ -204,6 +204,7 @@ void SlamRosWrapper::laserCallback(const sensor_msgs::LaserScan::ConstPtr &scan)
     tf::poseTFToMsg(odom_to_laser, odom_to_laser_msg);
     odom_pose_cache_.pose = odom_to_laser_msg;
     odom_pose_cache_.header.stamp = scan->header.stamp;
+    ROS_WARN("PROCESS SCAN!!");
     odom_pose_pub_.publish(odom_pose_cache_);
 
     /*
@@ -279,7 +280,8 @@ void SlamRosWrapper::mapRendererThread() {
 }
 
 void SlamRosWrapper::updateMap() {
-  ROS_DEBUG("Update map");
+  ROS_WARN("---------Update map: START-----------");
+  ros::Time start_time = ros::Time::now();
   boost::mutex::scoped_lock map_lock (map_mutex_);
   //GMapping::ScanMatcher matcher;
   cgr_slam::CgrScanMatcher matcher;
@@ -398,7 +400,8 @@ void SlamRosWrapper::updateMap() {
 
   sst_.publish(map_.map);
   sstm_.publish(map_.map.info);
-
+  ros::Time end_time = ros::Time::now();
+  ROS_WARN("---------Update map: End ... Duration=%lf -----------", (start_time - end_time).toSec());
 }
 
 void SlamRosWrapper::broadcastMapTransform() {
