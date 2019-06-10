@@ -3,6 +3,7 @@
 **A ROS package for Occupancy Grid Map based SLAM using Corrective Gradient Refinement based on a reserach paper**
 
 **Generalizing corrective gradient refinement in RBPF for occupancy grid LIDAR SLAM, ROBIO 2017**
+if you feel that the work is useful with your research, please cite
 ```
 @inproceedings{gcgrslam2017,
   title={Generalizing corrective gradient refinement in RBPF for occupancy grid LIDAR SLAM},
